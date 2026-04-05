@@ -1,0 +1,5256 @@
+{
+  "name": "trader bot mag 7 + amd",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://www.alphavantage.co/query",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "function",
+              "value": "RSI"
+            },
+            {
+              "name": "symbol",
+              "value": "AAPL"
+            },
+            {
+              "name": "interval",
+              "value": "daily"
+            },
+            {
+              "name": "time_period",
+              "value": "14"
+            },
+            {
+              "name": "series_type",
+              "value": "close"
+            },
+            {
+              "name": "apikey"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get RSI (AlphaVantage)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        432,
+        -64
+      ],
+      "notesInFlow": true,
+      "id": "32d71f30-b725-461a-aa97-66714811a7f0",
+      "notes": "Paste AlphaVantage Key in 'Query Parameters'"
+    },
+    {
+      "parameters": {
+        "url": "https://newsapi.org/v2/everything",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "Apple Inc"
+            },
+            {
+              "name": "sortBy",
+              "value": "popularity"
+            },
+            {
+              "name": "language",
+              "value": "en"
+            },
+            {
+              "name": "from",
+              "value": "={{ $today.minus({days: 2}).toFormat('yyyy-MM-dd') }}"
+            },
+            {
+              "name": "apikey"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get News (NewsAPI)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        432,
+        144
+      ],
+      "notesInFlow": true,
+      "id": "7a3f6d59-6fbf-40ea-96ff-4b4af05690a7",
+      "notes": "Paste NewsAPI Key in 'Query Parameters'"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "multiplex",
+        "options": {}
+      },
+      "name": "Merge Data",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        880,
+        48
+      ],
+      "id": "68b69ca4-89ef-4b0c-a6b6-a1e255c66d71"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ parseFloat($json.candidates[0].content.parts[0].text) }}",
+              "operation": "larger",
+              "value2": 0.5
+            },
+            {
+              "value1": "={{ $json.rsi }}",
+              "value2": 30
+            }
+          ]
+        }
+      },
+      "name": "Check Conditions",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1104,
+        48
+      ],
+      "notesInFlow": true,
+      "id": "85347952-1224-4d17-8eab-2f211bbfeb7c",
+      "notes": "Checks if Sentiment > 0.5"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\nJSON.stringify({\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"Analyze the sentiment of these headlines. Output ONLY a single number between 0.00 (Negative) and 1.00 (Positive). No text.\\n\\nHEADLINES:\\n\" + $('Get News (NewsAPI)').first().json.articles.map(a => a.title).join(\"\\n\")\n    }]\n  }]\n})\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        688,
+        160
+      ],
+      "id": "f6467b5e-e397-4fa8-aa99-995568091457",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Get the big \"Technical Analysis: RSI\" object\nconst allData = items[0].json[\"Technical Analysis: RSI\"];\n\n// 2. Get the list of dates (keys)\nconst dates = Object.keys(allData);\n\n// 3. Find the newest date (dates are YYYY-MM-DD, so sorting usually works, but usually index 0 is newest)\nconst newestDate = dates[0];\n\n// 4. Get the specific RSI number for that date\nconst rsiValue = allData[newestDate][\"RSI\"];\n\n// 5. Create a clean, single output\nreturn [{\n  json: {\n    date: newestDate,\n    rsi: parseFloat(rsiValue)\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        -80
+      ],
+      "id": "b9d2f7fd-4195-4766-b8eb-ec054079d58f",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://paper-api.alpaca.markets/v2/orders",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "APCA-API-KEY-ID"
+            },
+            {
+              "name": "APCA-API-SECRET-KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "symbol",
+              "value": "AAPL"
+            },
+            {
+              "name": "qty",
+              "value": "1"
+            },
+            {
+              "name": "side",
+              "value": "buy"
+            },
+            {
+              "name": "type",
+              "value": "market"
+            },
+            {
+              "name": "time_in_force",
+              "value": "day"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1376,
+        -288
+      ],
+      "id": "f088beed-7c8f-46fb-957d-618c5057f826",
+      "name": "HTTP Request1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://paper-api.alpaca.markets/v2/orders",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "APCA-API-KEY-ID"
+            },
+            {
+              "name": "APCA-API-SECRET-KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "symbol",
+              "value": "AAPL"
+            },
+            {
+              "name": "qty",
+              "value": "1"
+            },
+            {
+              "name": "side",
+              "value": "sell"
+            },
+            {
+              "name": "type",
+              "value": "market"
+            },
+            {
+              "name": "time_in_force",
+              "value": "day"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1568,
+        368
+      ],
+      "id": "07d5c779-b072-459b-95f9-f13d98986c65",
+      "name": "HTTP Request2"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ parseFloat($json.candidates[0].content.parts[0].text) }}",
+              "value2": 0.5
+            },
+            {
+              "value1": "={{ $json.rsi }}",
+              "operation": "larger",
+              "value2": 70
+            }
+          ]
+        }
+      },
+      "name": "Check Conditions1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1136,
+        288
+      ],
+      "notesInFlow": true,
+      "id": "14dc9317-c781-4882-b9d7-9b878217809e",
+      "notes": "Checks if Sentiment > 0.5"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 45 15 * * 1-5"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 0 10 * * 1-5"
+            }
+          ]
+        }
+      },
+      "name": "Daily Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        224,
+        48
+      ],
+      "id": "57191f98-bf7b-4147-972d-9064fcab4884"
+    },
+    {
+      "parameters": {
+        "url": "https://www.alphavantage.co/query",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "function",
+              "value": "RSI"
+            },
+            {
+              "name": "symbol",
+              "value": "NVDA"
+            },
+            {
+              "name": "interval",
+              "value": "daily"
+            },
+            {
+              "name": "time_period",
+              "value": "14"
+            },
+            {
+              "name": "series_type",
+              "value": "close"
+            },
+            {
+              "name": "apikey"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get RSI (AlphaVantage)1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        512,
+        752
+      ],
+      "notesInFlow": true,
+      "id": "8592b08e-540c-4a1c-af01-052fda36c9fe",
+      "notes": "Paste AlphaVantage Key in 'Query Parameters'"
+    },
+    {
+      "parameters": {
+        "url": "https://newsapi.org/v2/everything",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "NVIDIA Stock"
+            },
+            {
+              "name": "sortBy",
+              "value": "popularity"
+            },
+            {
+              "name": "language",
+              "value": "en"
+            },
+            {
+              "name": "from",
+              "value": "={{ $today.minus({days: 2}).toFormat('yyyy-MM-dd') }}"
+            },
+            {
+              "name": "apikey"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get News (NewsAPI)1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        512,
+        960
+      ],
+      "notesInFlow": true,
+      "id": "fa58d512-3b23-4c06-ac9d-be21a0c8ce11",
+      "notes": "Paste NewsAPI Key in 'Query Parameters'"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "multiplex",
+        "options": {}
+      },
+      "name": "Merge Data1",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        960,
+        864
+      ],
+      "id": "1db178c4-70aa-4029-b60e-5ba81c01baaf"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ parseFloat($json.candidates[0].content.parts[0].text) }}",
+              "operation": "larger",
+              "value2": 0.5
+            },
+            {
+              "value1": "={{ $json.rsi }}",
+              "value2": 30
+            }
+          ]
+        }
+      },
+      "name": "Check Conditions2",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1184,
+        864
+      ],
+      "notesInFlow": true,
+      "id": "ffe0dc3d-846d-4f7a-9e29-e6627f85f3bd",
+      "notes": "Checks if Sentiment > 0.5"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\nJSON.stringify({\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"Analyze the sentiment of these headlines. Output ONLY a single number between 0.00 (Negative) and 1.00 (Positive). No text.\\n\\nHEADLINES:\\n\" + $('Get News (NewsAPI)1').first().json.articles.map(a => a.title).join(\"\\n\")\n    }]\n  }]\n})\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        768,
+        976
+      ],
+      "id": "8d75ee7b-1df8-4e61-b390-1bd8ee9c24f2",
+      "name": "HTTP Request3"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Get the big \"Technical Analysis: RSI\" object\nconst allData = items[0].json[\"Technical Analysis: RSI\"];\n\n// 2. Get the list of dates (keys)\nconst dates = Object.keys(allData);\n\n// 3. Find the newest date (dates are YYYY-MM-DD, so sorting usually works, but usually index 0 is newest)\nconst newestDate = dates[0];\n\n// 4. Get the specific RSI number for that date\nconst rsiValue = allData[newestDate][\"RSI\"];\n\n// 5. Create a clean, single output\nreturn [{\n  json: {\n    date: newestDate,\n    rsi: parseFloat(rsiValue)\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        752,
+        736
+      ],
+      "id": "4a3e451b-7f80-44b6-9efc-b991244e1de6",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://paper-api.alpaca.markets/v2/orders",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "APCA-API-KEY-ID"
+            },
+            {
+              "name": "APCA-API-SECRET-KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "symbol",
+              "value": "NVDA"
+            },
+            {
+              "name": "qty",
+              "value": "1"
+            },
+            {
+              "name": "side",
+              "value": "buy"
+            },
+            {
+              "name": "type",
+              "value": "market"
+            },
+            {
+              "name": "time_in_force",
+              "value": "day"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1376,
+        512
+      ],
+      "id": "dc19bdf1-d19d-4bdb-8570-5820a53811a5",
+      "name": "HTTP Request4"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://paper-api.alpaca.markets/v2/orders",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "APCA-API-KEY-ID"
+            },
+            {
+              "name": "APCA-API-SECRET-KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "symbol",
+              "value": "NVDA"
+            },
+            {
+              "name": "qty",
+              "value": "1"
+            },
+            {
+              "name": "side",
+              "value": "sell"
+            },
+            {
+              "name": "type",
+              "value": "market"
+            },
+            {
+              "name": "time_in_force",
+              "value": "day"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1664,
+        1120
+      ],
+      "id": "ca603007-1230-47f5-abae-42406ea78e82",
+      "name": "HTTP Request5"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ parseFloat($json.candidates[0].content.parts[0].text) }}",
+              "value2": 0.5
+            },
+            {
+              "value1": "={{ $json.rsi }}",
+              "operation": "larger",
+              "value2": 70
+            }
+          ]
+        }
+      },
+      "name": "Check Conditions3",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1216,
+        1104
+      ],
+      "notesInFlow": true,
+      "id": "f4501f67-a242-4c79-8589-cacb2c82675b",
+      "notes": "Checks if Sentiment > 0.5"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 46 15 * * 1-5"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 01 10 * * 1-5"
+            }
+          ]
+        }
+      },
+      "name": "Daily Schedule1",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        304,
+        864
+      ],
+      "id": "15ba805f-870b-4299-81ef-f59a8159bfef"
+    },
+    {
+      "parameters": {
+        "content": "## APPLE"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -128,
+        -16
+      ],
+      "typeVersion": 1,
+      "id": "32dd84ec-14f4-42fc-a466-5ff88c49175b",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## NVIDIA"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -128,
+        848
+      ],
+      "typeVersion": 1,
+      "id": "1681a1a9-d936-4f80-81fb-cce0bd59cbc8",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "url": "https://www.alphavantage.co/query",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "function",
+              "value": "RSI"
+            },
+            {
+              "name": "symbol",
+              "value": "GOOGL"
+            },
+            {
+              "name": "interval",
+              "value": "daily"
+            },
+            {
+              "name": "time_period",
+              "value": "14"
+            },
+            {
+              "name": "series_type",
+              "value": "close"
+            },
+            {
+              "name": "apikey"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get RSI (AlphaVantage)2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        576,
+        1504
+      ],
+      "notesInFlow": true,
+      "id": "02b6f184-f287-4f39-823c-92701cb145ca",
+      "notes": "Paste AlphaVantage Key in 'Query Parameters'"
+    },
+    {
+      "parameters": {
+        "url": "https://newsapi.org/v2/everything",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "Google Stock"
+            },
+            {
+              "name": "sortBy",
+              "value": "popularity"
+            },
+            {
+              "name": "language",
+              "value": "en"
+            },
+            {
+              "name": "from",
+              "value": "={{ $today.minus({days: 2}).toFormat('yyyy-MM-dd') }}"
+            },
+            {
+              "name": "apikey"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get News (NewsAPI)2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        576,
+        1712
+      ],
+      "notesInFlow": true,
+      "id": "c0bd1c45-b463-4223-92ae-620fa6f23ccf",
+      "notes": "Paste NewsAPI Key in 'Query Parameters'"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "multiplex",
+        "options": {}
+      },
+      "name": "Merge Data2",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        1024,
+        1616
+      ],
+      "id": "47c53ba0-c220-4c02-919d-7789fdab3f62"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ parseFloat($json.candidates[0].content.parts[0].text) }}",
+              "operation": "larger",
+              "value2": 0.5
+            },
+            {
+              "value1": "={{ $json.rsi }}",
+              "value2": 30
+            }
+          ]
+        }
+      },
+      "name": "Check Conditions4",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1248,
+        1616
+      ],
+      "notesInFlow": true,
+      "id": "d53ef847-717a-403a-8ef5-051ba4db9e53",
+      "notes": "Checks if Sentiment > 0.5"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\nJSON.stringify({\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"Analyze the sentiment of these headlines. Output ONLY a single number between 0.00 (Negative) and 1.00 (Positive). No text.\\n\\nHEADLINES:\\n\" + $('Get News (NewsAPI)2').first().json.articles.map(a => a.title).join(\"\\n\")\n    }]\n  }]\n})\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        832,
+        1728
+      ],
+      "id": "6d455e95-eacd-4be8-aed4-739177cfde25",
+      "name": "HTTP Request6"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Get the big \"Technical Analysis: RSI\" object\nconst allData = items[0].json[\"Technical Analysis: RSI\"];\n\n// 2. Get the list of dates (keys)\nconst dates = Object.keys(allData);\n\n// 3. Find the newest date (dates are YYYY-MM-DD, so sorting usually works, but usually index 0 is newest)\nconst newestDate = dates[0];\n\n// 4. Get the specific RSI number for that date\nconst rsiValue = allData[newestDate][\"RSI\"];\n\n// 5. Create a clean, single output\nreturn [{\n  json: {\n    date: newestDate,\n    rsi: parseFloat(rsiValue)\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        816,
+        1488
+      ],
+      "id": "a1771f35-482d-4df6-9c00-d728be8b141c",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://paper-api.alpaca.markets/v2/orders",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "APCA-API-KEY-ID"
+            },
+            {
+              "name": "APCA-API-SECRET-KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "symbol",
+              "value": "GOOGL"
+            },
+            {
+              "name": "qty",
+              "value": "1"
+            },
+            {
+              "name": "side",
+              "value": "buy"
+            },
+            {
+              "name": "type",
+              "value": "market"
+            },
+            {
+              "name": "time_in_force",
+              "value": "day"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1472,
+        1328
+      ],
+      "id": "ae9acba5-2482-4a8d-bc13-11cadfb83384",
+      "name": "HTTP Request7"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://paper-api.alpaca.markets/v2/orders",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "APCA-API-KEY-ID"
+            },
+            {
+              "name": "APCA-API-SECRET-KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "symbol",
+              "value": "GOOGL"
+            },
+            {
+              "name": "qty",
+              "value": "1"
+            },
+            {
+              "name": "side",
+              "value": "sell"
+            },
+            {
+              "name": "type",
+              "value": "market"
+            },
+            {
+              "name": "time_in_force",
+              "value": "day"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1728,
+        1872
+      ],
+      "id": "50ec7cf7-14d2-4ba0-9389-98809ec487f0",
+      "name": "HTTP Request8"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ parseFloat($json.candidates[0].content.parts[0].text) }}",
+              "value2": 0.5
+            },
+            {
+              "value1": "={{ $json.rsi }}",
+              "operation": "larger",
+              "value2": 70
+            }
+          ]
+        }
+      },
+      "name": "Check Conditions5",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1280,
+        1856
+      ],
+      "notesInFlow": true,
+      "id": "2b43cf35-d3f8-4ffb-9d8c-bc302cd6e496",
+      "notes": "Checks if Sentiment > 0.5"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 47 15 * * 1-5"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 02 10 * * 1-5"
+            }
+          ]
+        }
+      },
+      "name": "Daily Schedule2",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        368,
+        1616
+      ],
+      "id": "bcb2b364-5f14-4cae-a46c-45657a257b23"
+    },
+    {
+      "parameters": {
+        "content": "# GOOGLE"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -96,
+        1600
+      ],
+      "typeVersion": 1,
+      "id": "f61a288b-8c9a-4bcf-aea1-9ee0a5ca57c7",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "url": "https://www.alphavantage.co/query",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "function",
+              "value": "RSI"
+            },
+            {
+              "name": "symbol",
+              "value": "AMZN"
+            },
+            {
+              "name": "interval",
+              "value": "daily"
+            },
+            {
+              "name": "time_period",
+              "value": "14"
+            },
+            {
+              "name": "series_type",
+              "value": "close"
+            },
+            {
+              "name": "apikey"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get RSI (AlphaVantage)3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        528,
+        2128
+      ],
+      "notesInFlow": true,
+      "id": "fdf9970e-ecda-4558-92e3-702d4ff6e26c",
+      "notes": "Paste AlphaVantage Key in 'Query Parameters'"
+    },
+    {
+      "parameters": {
+        "url": "https://newsapi.org/v2/everything",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "Amazon Stock"
+            },
+            {
+              "name": "sortBy",
+              "value": "popularity"
+            },
+            {
+              "name": "language",
+              "value": "en"
+            },
+            {
+              "name": "from",
+              "value": "={{ $today.minus({days: 2}).toFormat('yyyy-MM-dd') }}"
+            },
+            {
+              "name": "apikey"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get News (NewsAPI)3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        528,
+        2336
+      ],
+      "notesInFlow": true,
+      "id": "6a7aee1f-179b-4ef1-83e2-f329e7ec4082",
+      "notes": "Paste NewsAPI Key in 'Query Parameters'"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "multiplex",
+        "options": {}
+      },
+      "name": "Merge Data3",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        976,
+        2240
+      ],
+      "id": "51e85299-56e5-4c0d-86a4-dc1ed277482d"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ parseFloat($json.candidates[0].content.parts[0].text) }}",
+              "operation": "larger",
+              "value2": 0.5
+            },
+            {
+              "value1": "={{ $json.rsi }}",
+              "value2": 30
+            }
+          ]
+        }
+      },
+      "name": "Check Conditions6",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        2240
+      ],
+      "notesInFlow": true,
+      "id": "4d0e0d4f-3cdb-4739-a9a2-128b1a3b3e62",
+      "notes": "Checks if Sentiment > 0.5"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\nJSON.stringify({\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"Analyze the sentiment of these headlines. Output ONLY a single number between 0.00 (Negative) and 1.00 (Positive). No text.\\n\\nHEADLINES:\\n\" + $('Get News (NewsAPI)3').first().json.articles.map(a => a.title).join(\"\\n\")\n    }]\n  }]\n})\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        784,
+        2352
+      ],
+      "id": "2cabc953-07f6-419b-ad2f-34a62936deff",
+      "name": "HTTP Request9"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Get the big \"Technical Analysis: RSI\" object\nconst allData = items[0].json[\"Technical Analysis: RSI\"];\n\n// 2. Get the list of dates (keys)\nconst dates = Object.keys(allData);\n\n// 3. Find the newest date (dates are YYYY-MM-DD, so sorting usually works, but usually index 0 is newest)\nconst newestDate = dates[0];\n\n// 4. Get the specific RSI number for that date\nconst rsiValue = allData[newestDate][\"RSI\"];\n\n// 5. Create a clean, single output\nreturn [{\n  json: {\n    date: newestDate,\n    rsi: parseFloat(rsiValue)\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        2112
+      ],
+      "id": "26f6e845-8747-4cbd-9470-2e95a2e273a7",
+      "name": "Code in JavaScript3"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://paper-api.alpaca.markets/v2/orders",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "APCA-API-KEY-ID"
+            },
+            {
+              "name": "APCA-API-SECRET-KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "symbol",
+              "value": "AMZN"
+            },
+            {
+              "name": "qty",
+              "value": "1"
+            },
+            {
+              "name": "side",
+              "value": "buy"
+            },
+            {
+              "name": "type",
+              "value": "market"
+            },
+            {
+              "name": "time_in_force",
+              "value": "day"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1456,
+        1984
+      ],
+      "id": "9c697c7b-5cfb-4cc3-ab6d-0e9ba328357f",
+      "name": "HTTP Request10"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://paper-api.alpaca.markets/v2/orders",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "APCA-API-KEY-ID"
+            },
+            {
+              "name": "APCA-API-SECRET-KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "symbol",
+              "value": "AMZN"
+            },
+            {
+              "name": "qty",
+              "value": "1"
+            },
+            {
+              "name": "side",
+              "value": "sell"
+            },
+            {
+              "name": "type",
+              "value": "market"
+            },
+            {
+              "name": "time_in_force",
+              "value": "day"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1904,
+        2528
+      ],
+      "id": "ca8e6691-95bd-42bc-8a43-6dcd7157319f",
+      "name": "HTTP Request11"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ parseFloat($json.candidates[0].content.parts[0].text) }}",
+              "value2": 0.5
+            },
+            {
+              "value1": "={{ $json.rsi }}",
+              "operation": "larger",
+              "value2": 70
+            }
+          ]
+        }
+      },
+      "name": "Check Conditions7",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1232,
+        2480
+      ],
+      "notesInFlow": true,
+      "id": "f5670da3-1ffd-410a-9ee4-1d981a04744c",
+      "notes": "Checks if Sentiment > 0.5"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 48 15 * * 1-5"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 03 10 * * 1-5"
+            }
+          ]
+        }
+      },
+      "name": "Daily Schedule3",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        320,
+        2240
+      ],
+      "id": "e4795f4a-440a-4e1c-b3db-85cc8314de5f"
+    },
+    {
+      "parameters": {
+        "content": "# Amazon"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -128,
+        2272
+      ],
+      "typeVersion": 1,
+      "id": "8683ff28-0238-4095-bc6c-167346f2ea2c",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "url": "https://www.alphavantage.co/query",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "function",
+              "value": "RSI"
+            },
+            {
+              "name": "symbol",
+              "value": "TSLA"
+            },
+            {
+              "name": "interval",
+              "value": "daily"
+            },
+            {
+              "name": "time_period",
+              "value": "14"
+            },
+            {
+              "name": "series_type",
+              "value": "close"
+            },
+            {
+              "name": "apikey"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get RSI (AlphaVantage)4",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        544,
+        2800
+      ],
+      "notesInFlow": true,
+      "id": "6bb34ae8-b264-45cf-8f53-8cab1b864b45",
+      "notes": "Paste AlphaVantage Key in 'Query Parameters'"
+    },
+    {
+      "parameters": {
+        "url": "https://newsapi.org/v2/everything",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "Tesla Stock"
+            },
+            {
+              "name": "sortBy",
+              "value": "popularity"
+            },
+            {
+              "name": "language",
+              "value": "en"
+            },
+            {
+              "name": "from",
+              "value": "={{ $today.minus({days: 2}).toFormat('yyyy-MM-dd') }}"
+            },
+            {
+              "name": "apikey"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get News (NewsAPI)4",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        544,
+        3008
+      ],
+      "notesInFlow": true,
+      "id": "c53f9e80-6c05-4786-9416-cf6b18fecf9c",
+      "notes": "Paste NewsAPI Key in 'Query Parameters'"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "multiplex",
+        "options": {}
+      },
+      "name": "Merge Data4",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        992,
+        2912
+      ],
+      "id": "79bd70f1-d097-4a52-829e-077c20a361cd"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ parseFloat($json.candidates[0].content.parts[0].text) }}",
+              "operation": "larger",
+              "value2": 0.5
+            },
+            {
+              "value1": "={{ $json.rsi }}",
+              "value2": 30
+            }
+          ]
+        }
+      },
+      "name": "Check Conditions8",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1216,
+        2912
+      ],
+      "notesInFlow": true,
+      "id": "d311788d-4582-4dbc-9f96-ca7225eb980d",
+      "notes": "Checks if Sentiment > 0.5"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\nJSON.stringify({\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"Analyze the sentiment of these headlines. Output ONLY a single number between 0.00 (Negative) and 1.00 (Positive). No text.\\n\\nHEADLINES:\\n\" + $('Get News (NewsAPI)4').first().json.articles.map(a => a.title).join(\"\\n\")\n    }]\n  }]\n})\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        800,
+        3024
+      ],
+      "id": "3472978d-ea00-4ead-bb63-740e0c2c4317",
+      "name": "HTTP Request12"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Get the big \"Technical Analysis: RSI\" object\nconst allData = items[0].json[\"Technical Analysis: RSI\"];\n\n// 2. Get the list of dates (keys)\nconst dates = Object.keys(allData);\n\n// 3. Find the newest date (dates are YYYY-MM-DD, so sorting usually works, but usually index 0 is newest)\nconst newestDate = dates[0];\n\n// 4. Get the specific RSI number for that date\nconst rsiValue = allData[newestDate][\"RSI\"];\n\n// 5. Create a clean, single output\nreturn [{\n  json: {\n    date: newestDate,\n    rsi: parseFloat(rsiValue)\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        784,
+        2784
+      ],
+      "id": "f526e68c-d672-4c47-9dfd-c02ea394abc8",
+      "name": "Code in JavaScript4"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://paper-api.alpaca.markets/v2/orders",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "APCA-API-KEY-ID"
+            },
+            {
+              "name": "APCA-API-SECRET-KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "symbol",
+              "value": "TSLA"
+            },
+            {
+              "name": "qty",
+              "value": "1"
+            },
+            {
+              "name": "side",
+              "value": "buy"
+            },
+            {
+              "name": "type",
+              "value": "market"
+            },
+            {
+              "name": "time_in_force",
+              "value": "day"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1472,
+        2624
+      ],
+      "id": "bacc7c88-8c68-4131-9eb3-e0bc8312f71e",
+      "name": "HTTP Request13"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://paper-api.alpaca.markets/v2/orders",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "APCA-API-KEY-ID"
+            },
+            {
+              "name": "APCA-API-SECRET-KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "symbol",
+              "value": "TSLA"
+            },
+            {
+              "name": "qty",
+              "value": "1"
+            },
+            {
+              "name": "side",
+              "value": "sell"
+            },
+            {
+              "name": "type",
+              "value": "market"
+            },
+            {
+              "name": "time_in_force",
+              "value": "day"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1776,
+        3200
+      ],
+      "id": "cd0b55d1-1d32-40df-90d4-6f8728d31848",
+      "name": "HTTP Request14"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ parseFloat($json.candidates[0].content.parts[0].text) }}",
+              "value2": 0.5
+            },
+            {
+              "value1": "={{ $json.rsi }}",
+              "operation": "larger",
+              "value2": 70
+            }
+          ]
+        }
+      },
+      "name": "Check Conditions9",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1248,
+        3152
+      ],
+      "notesInFlow": true,
+      "id": "4afe58a5-2f82-4106-9114-f717328de979",
+      "notes": "Checks if Sentiment > 0.5"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 49 15 * * 1-5"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 04 10 * * 1-5"
+            }
+          ]
+        }
+      },
+      "name": "Daily Schedule4",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        336,
+        2912
+      ],
+      "id": "ec0968a1-02f5-4174-88f6-15e64eb13e51"
+    },
+    {
+      "parameters": {
+        "content": "# tesla"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -304,
+        2800
+      ],
+      "typeVersion": 1,
+      "id": "844e0a04-c3f7-4401-8a0a-cbd94fe567c7",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "url": "https://www.alphavantage.co/query",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "function",
+              "value": "RSI"
+            },
+            {
+              "name": "symbol",
+              "value": "META"
+            },
+            {
+              "name": "interval",
+              "value": "daily"
+            },
+            {
+              "name": "time_period",
+              "value": "14"
+            },
+            {
+              "name": "series_type",
+              "value": "close"
+            },
+            {
+              "name": "apikey"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get RSI (AlphaVantage)5",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        608,
+        3488
+      ],
+      "notesInFlow": true,
+      "id": "6dd5ac7e-379b-43e1-9d5a-634f0efbbebe",
+      "notes": "Paste AlphaVantage Key in 'Query Parameters'"
+    },
+    {
+      "parameters": {
+        "url": "https://newsapi.org/v2/everything",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "Meta Stock"
+            },
+            {
+              "name": "sortBy",
+              "value": "popularity"
+            },
+            {
+              "name": "language",
+              "value": "en"
+            },
+            {
+              "name": "from",
+              "value": "={{ $today.minus({days: 2}).toFormat('yyyy-MM-dd') }}"
+            },
+            {
+              "name": "apikey"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get News (NewsAPI)5",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        608,
+        3696
+      ],
+      "notesInFlow": true,
+      "id": "1ce376dd-56d6-4b4e-864c-4d02ea0a220d",
+      "notes": "Paste NewsAPI Key in 'Query Parameters'"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "multiplex",
+        "options": {}
+      },
+      "name": "Merge Data5",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        1056,
+        3600
+      ],
+      "id": "e4118955-d6f3-40cb-9f2a-a7918f6a9817"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ parseFloat($json.candidates[0].content.parts[0].text) }}",
+              "operation": "larger",
+              "value2": 0.5
+            },
+            {
+              "value1": "={{ $json.rsi }}",
+              "value2": 30
+            }
+          ]
+        }
+      },
+      "name": "Check Conditions10",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1280,
+        3600
+      ],
+      "notesInFlow": true,
+      "id": "39b2bd0e-0e1c-4a26-9594-042c68da0024",
+      "notes": "Checks if Sentiment > 0.5"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\nJSON.stringify({\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"Analyze the sentiment of these headlines. Output ONLY a single number between 0.00 (Negative) and 1.00 (Positive). No text.\\n\\nHEADLINES:\\n\" + $('Get News (NewsAPI)5').first().json.articles.map(a => a.title).join(\"\\n\")\n    }]\n  }]\n})\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        864,
+        3712
+      ],
+      "id": "050cea2c-72dc-4478-9f5e-91019d272e0a",
+      "name": "HTTP Request15"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Get the big \"Technical Analysis: RSI\" object\nconst allData = items[0].json[\"Technical Analysis: RSI\"];\n\n// 2. Get the list of dates (keys)\nconst dates = Object.keys(allData);\n\n// 3. Find the newest date (dates are YYYY-MM-DD, so sorting usually works, but usually index 0 is newest)\nconst newestDate = dates[0];\n\n// 4. Get the specific RSI number for that date\nconst rsiValue = allData[newestDate][\"RSI\"];\n\n// 5. Create a clean, single output\nreturn [{\n  json: {\n    date: newestDate,\n    rsi: parseFloat(rsiValue)\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        848,
+        3472
+      ],
+      "id": "5a4445d6-2ba3-4f90-946a-baafd223d31d",
+      "name": "Code in JavaScript5"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://paper-api.alpaca.markets/v2/orders",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "APCA-API-KEY-ID"
+            },
+            {
+              "name": "APCA-API-SECRET-KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "symbol",
+              "value": "META"
+            },
+            {
+              "name": "qty",
+              "value": "1"
+            },
+            {
+              "name": "side",
+              "value": "buy"
+            },
+            {
+              "name": "type",
+              "value": "market"
+            },
+            {
+              "name": "time_in_force",
+              "value": "day"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1520,
+        3360
+      ],
+      "id": "a2e36267-b859-4834-9f07-b905b2e2cac0",
+      "name": "HTTP Request16"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://paper-api.alpaca.markets/v2/orders",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "APCA-API-KEY-ID"
+            },
+            {
+              "name": "APCA-API-SECRET-KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "symbol",
+              "value": "META"
+            },
+            {
+              "name": "qty",
+              "value": "1"
+            },
+            {
+              "name": "side",
+              "value": "sell"
+            },
+            {
+              "name": "type",
+              "value": "market"
+            },
+            {
+              "name": "time_in_force",
+              "value": "day"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1968,
+        4000
+      ],
+      "id": "52a719ab-d98a-41e1-bc7c-97561b2bccd4",
+      "name": "HTTP Request17"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ parseFloat($json.candidates[0].content.parts[0].text) }}",
+              "value2": 0.5
+            },
+            {
+              "value1": "={{ $json.rsi }}",
+              "operation": "larger",
+              "value2": 70
+            }
+          ]
+        }
+      },
+      "name": "Check Conditions11",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1312,
+        3840
+      ],
+      "notesInFlow": true,
+      "id": "d9090ef7-5d9c-437a-9971-f6090023e2bd",
+      "notes": "Checks if Sentiment > 0.5"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 50 15 * * 1-5"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 05 10 * * 1-5"
+            }
+          ]
+        }
+      },
+      "name": "Daily Schedule5",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        400,
+        3600
+      ],
+      "id": "45a31c85-381c-48a2-a623-70185391900a"
+    },
+    {
+      "parameters": {
+        "content": "# Meta"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -96,
+        3552
+      ],
+      "typeVersion": 1,
+      "id": "99ac30c8-6fc8-495c-9deb-c04b2ec6b2c8",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "url": "https://www.alphavantage.co/query",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "function",
+              "value": "RSI"
+            },
+            {
+              "name": "symbol",
+              "value": "MSFT"
+            },
+            {
+              "name": "interval",
+              "value": "daily"
+            },
+            {
+              "name": "time_period",
+              "value": "14"
+            },
+            {
+              "name": "series_type",
+              "value": "close"
+            },
+            {
+              "name": "apikey"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get RSI (AlphaVantage)6",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        496,
+        4080
+      ],
+      "notesInFlow": true,
+      "id": "5eb45d50-2b54-458b-88d4-69fb811e9be6",
+      "notes": "Paste AlphaVantage Key in 'Query Parameters'"
+    },
+    {
+      "parameters": {
+        "url": "https://newsapi.org/v2/everything",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "Microsoft Stock"
+            },
+            {
+              "name": "sortBy",
+              "value": "popularity"
+            },
+            {
+              "name": "language",
+              "value": "en"
+            },
+            {
+              "name": "from",
+              "value": "={{ $today.minus({days: 2}).toFormat('yyyy-MM-dd') }}"
+            },
+            {
+              "name": "apikey"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get News (NewsAPI)6",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        496,
+        4288
+      ],
+      "notesInFlow": true,
+      "id": "3eee5bfe-9ed2-4b53-b901-b75b8860b1d4",
+      "notes": "Paste NewsAPI Key in 'Query Parameters'"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "multiplex",
+        "options": {}
+      },
+      "name": "Merge Data6",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        944,
+        4192
+      ],
+      "id": "0c84cdd5-d9a3-4a1a-a97a-92c487f15b69"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ parseFloat($json.candidates[0].content.parts[0].text) }}",
+              "operation": "larger",
+              "value2": 0.5
+            },
+            {
+              "value1": "={{ $json.rsi }}",
+              "value2": 30
+            }
+          ]
+        }
+      },
+      "name": "Check Conditions12",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1168,
+        4192
+      ],
+      "notesInFlow": true,
+      "id": "a3ecfe17-5e05-45f5-93ba-b33eca7369e0",
+      "notes": "Checks if Sentiment > 0.5"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\nJSON.stringify({\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"Analyze the sentiment of these headlines. Output ONLY a single number between 0.00 (Negative) and 1.00 (Positive). No text.\\n\\nHEADLINES:\\n\" + $('Get News (NewsAPI)6').first().json.articles.map(a => a.title).join(\"\\n\")\n    }]\n  }]\n})\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        752,
+        4304
+      ],
+      "id": "2e88e011-e93b-4c7c-b532-b0c1c8586dd4",
+      "name": "HTTP Request18"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Get the big \"Technical Analysis: RSI\" object\nconst allData = items[0].json[\"Technical Analysis: RSI\"];\n\n// 2. Get the list of dates (keys)\nconst dates = Object.keys(allData);\n\n// 3. Find the newest date (dates are YYYY-MM-DD, so sorting usually works, but usually index 0 is newest)\nconst newestDate = dates[0];\n\n// 4. Get the specific RSI number for that date\nconst rsiValue = allData[newestDate][\"RSI\"];\n\n// 5. Create a clean, single output\nreturn [{\n  json: {\n    date: newestDate,\n    rsi: parseFloat(rsiValue)\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        736,
+        4064
+      ],
+      "id": "295cc96f-605a-4dfc-9bf5-fb010b35fd59",
+      "name": "Code in JavaScript6"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://paper-api.alpaca.markets/v2/orders",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "APCA-API-KEY-ID"
+            },
+            {
+              "name": "APCA-API-SECRET-KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "symbol",
+              "value": "MSFT"
+            },
+            {
+              "name": "qty",
+              "value": "1"
+            },
+            {
+              "name": "side",
+              "value": "buy"
+            },
+            {
+              "name": "type",
+              "value": "market"
+            },
+            {
+              "name": "time_in_force",
+              "value": "day"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1376,
+        4096
+      ],
+      "id": "b7956888-140f-4870-b28e-cdea5f0fbd6f",
+      "name": "HTTP Request19"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://paper-api.alpaca.markets/v2/orders",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "APCA-API-KEY-ID"
+            },
+            {
+              "name": "APCA-API-SECRET-KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "symbol",
+              "value": "MSFT"
+            },
+            {
+              "name": "qty",
+              "value": "1"
+            },
+            {
+              "name": "side",
+              "value": "sell"
+            },
+            {
+              "name": "type",
+              "value": "market"
+            },
+            {
+              "name": "time_in_force",
+              "value": "day"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1728,
+        4608
+      ],
+      "id": "85af43cc-562c-4051-a5ab-c298d9d4b352",
+      "name": "HTTP Request20"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ parseFloat($json.candidates[0].content.parts[0].text) }}",
+              "value2": 0.5
+            },
+            {
+              "value1": "={{ $json.rsi }}",
+              "operation": "larger",
+              "value2": 70
+            }
+          ]
+        }
+      },
+      "name": "Check Conditions13",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        4432
+      ],
+      "notesInFlow": true,
+      "id": "fb7c80a4-b164-4566-a3ee-285ef5a66e73",
+      "notes": "Checks if Sentiment > 0.5"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 51 15 * * 1-5"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 06 10 * * 1-5"
+            }
+          ]
+        }
+      },
+      "name": "Daily Schedule6",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        288,
+        4192
+      ],
+      "id": "bd95dbc8-027a-4639-966b-10354a5c52dc"
+    },
+    {
+      "parameters": {
+        "content": "# microsoft"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -64,
+        4160
+      ],
+      "typeVersion": 1,
+      "id": "fa4b2ca9-b377-4b0b-8012-a768612ac918",
+      "name": "Sticky Note6"
+    },
+    {
+      "parameters": {
+        "url": "https://www.alphavantage.co/query",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "function",
+              "value": "RSI"
+            },
+            {
+              "name": "symbol",
+              "value": "AMD"
+            },
+            {
+              "name": "interval",
+              "value": "daily"
+            },
+            {
+              "name": "time_period",
+              "value": "14"
+            },
+            {
+              "name": "series_type",
+              "value": "close"
+            },
+            {
+              "name": "apikey"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get RSI (AlphaVantage)7",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        496,
+        4752
+      ],
+      "notesInFlow": true,
+      "id": "676dec37-78b1-407a-9be9-a1e3257b6ed1",
+      "notes": "Paste AlphaVantage Key in 'Query Parameters'"
+    },
+    {
+      "parameters": {
+        "url": "https://newsapi.org/v2/everything",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "AMD Stock"
+            },
+            {
+              "name": "sortBy",
+              "value": "popularity"
+            },
+            {
+              "name": "language",
+              "value": "en"
+            },
+            {
+              "name": "from",
+              "value": "={{ $today.minus({days: 2}).toFormat('yyyy-MM-dd') }}"
+            },
+            {
+              "name": "apikey"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get News (NewsAPI)7",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        496,
+        4960
+      ],
+      "notesInFlow": true,
+      "id": "cfff236c-58dd-44f5-b857-25ada5df0ec1",
+      "notes": "Paste NewsAPI Key in 'Query Parameters'"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "multiplex",
+        "options": {}
+      },
+      "name": "Merge Data7",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        944,
+        4864
+      ],
+      "id": "376e81cb-bdc4-4641-a994-0f38bbfe0f90"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ parseFloat($json.candidates[0].content.parts[0].text) }}",
+              "operation": "larger",
+              "value2": 0.5
+            },
+            {
+              "value1": "={{ $json.rsi }}",
+              "value2": 30
+            }
+          ]
+        }
+      },
+      "name": "Check Conditions14",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1168,
+        4864
+      ],
+      "notesInFlow": true,
+      "id": "90bc5c41-9985-4a45-bc1e-f2171b47a32f",
+      "notes": "Checks if Sentiment > 0.5"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\nJSON.stringify({\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"Analyze the sentiment of these headlines. Output ONLY a single number between 0.00 (Negative) and 1.00 (Positive). No text.\\n\\nHEADLINES:\\n\" + $('Get News (NewsAPI)7').first().json.articles.map(a => a.title).join(\"\\n\")\n    }]\n  }]\n})\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        752,
+        4976
+      ],
+      "id": "22e0c1a9-f9e6-453f-a59f-322af83c86d2",
+      "name": "HTTP Request21"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Get the big \"Technical Analysis: RSI\" object\nconst allData = items[0].json[\"Technical Analysis: RSI\"];\n\n// 2. Get the list of dates (keys)\nconst dates = Object.keys(allData);\n\n// 3. Find the newest date (dates are YYYY-MM-DD, so sorting usually works, but usually index 0 is newest)\nconst newestDate = dates[0];\n\n// 4. Get the specific RSI number for that date\nconst rsiValue = allData[newestDate][\"RSI\"];\n\n// 5. Create a clean, single output\nreturn [{\n  json: {\n    date: newestDate,\n    rsi: parseFloat(rsiValue)\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        736,
+        4736
+      ],
+      "id": "99fdabba-2543-493c-ae53-ccd46c48757c",
+      "name": "Code in JavaScript7"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://paper-api.alpaca.markets/v2/orders",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "APCA-API-KEY-ID"
+            },
+            {
+              "name": "APCA-API-SECRET-KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "symbol",
+              "value": "AMD"
+            },
+            {
+              "name": "qty",
+              "value": "1"
+            },
+            {
+              "name": "side",
+              "value": "buy"
+            },
+            {
+              "name": "type",
+              "value": "market"
+            },
+            {
+              "name": "time_in_force",
+              "value": "day"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1376,
+        4768
+      ],
+      "id": "29d7a78d-29ae-408c-b8d7-95ada419fda5",
+      "name": "HTTP Request22"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://paper-api.alpaca.markets/v2/orders",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "APCA-API-KEY-ID"
+            },
+            {
+              "name": "APCA-API-SECRET-KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "symbol",
+              "value": "AMD"
+            },
+            {
+              "name": "qty",
+              "value": "1"
+            },
+            {
+              "name": "side",
+              "value": "sell"
+            },
+            {
+              "name": "type",
+              "value": "market"
+            },
+            {
+              "name": "time_in_force",
+              "value": "day"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1760,
+        5360
+      ],
+      "id": "19055461-ad44-4349-a5e9-42eb288937b3",
+      "name": "HTTP Request23"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ parseFloat($json.candidates[0].content.parts[0].text) }}",
+              "value2": 0.5
+            },
+            {
+              "value1": "={{ $json.rsi }}",
+              "operation": "larger",
+              "value2": 70
+            }
+          ]
+        }
+      },
+      "name": "Check Conditions15",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        5104
+      ],
+      "notesInFlow": true,
+      "id": "8dbcf623-989d-4e72-b37f-2eb158b3ed9c",
+      "notes": "Checks if Sentiment > 0.5"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 44 15 * * 1-5"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 59 09 * * 1-5"
+            }
+          ]
+        }
+      },
+      "name": "Daily Schedule7",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        288,
+        4864
+      ],
+      "id": "d968c881-b976-403a-b2ec-877ba30cac54"
+    },
+    {
+      "parameters": {
+        "content": "# AMD"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -48,
+        4800
+      ],
+      "typeVersion": 1,
+      "id": "52e6dc0c-0382-4b12-91f9-e38d69df98bd",
+      "name": "Sticky Note7"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "name",
+          "cachedResultName": "",
+          "cachedResultUrl": ""
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2208,
+        -96
+      ],
+      "id": "b355f81f-49d4-42ea-8849-c82e3e78df36",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleApi": {
+          "id": "Mx1kUUCV4SSHFgfo",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8187cd7f-312a-4ee8-b452-52af5b5829cb",
+              "name": "Symbol",
+              "value": "={{ $json.symbol }}",
+              "type": "string"
+            },
+            {
+              "id": "b66429b2-1d64-4635-b520-380f656e4ac8",
+              "name": "Price",
+              "value": "={{ $json.filled_avg_price || 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "53170e06-4700-4a40-aff3-b4cf77ce2dcb",
+              "name": "RSI",
+              "value": "={{ $('Merge Data').first().json.rsi }}",
+              "type": "string"
+            },
+            {
+              "id": "b5a97e6d-e416-47da-8bad-0d6d86d2b353",
+              "name": "Side",
+              "value": "={{ $json.side }}",
+              "type": "string"
+            },
+            {
+              "id": "2b07ef17-cd23-45d1-bc89-8770f21b878f",
+              "name": "Sentiment",
+              "value": "={{ $('Merge Data').first().json.candidates[0].content.parts[0].text }}",
+              "type": "string"
+            },
+            {
+              "id": "4f03e92e-08e7-45ab-8c6b-9906558e418f",
+              "name": "Time",
+              "value": "={{ $now.format('yyyy-MM-dd HH:mm') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2000,
+        112
+      ],
+      "id": "e0cab9ce-e485-441f-9236-4aed6630b712",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "name",
+          "cachedResultName": "",
+          "cachedResultUrl": ""
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2064,
+        688
+      ],
+      "id": "7f99e0b8-2458-4fb3-8194-d8dda99184b6",
+      "name": "Append row in sheet1",
+      "credentials": {
+        "googleApi": {
+          "id": "Mx1kUUCV4SSHFgfo",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8187cd7f-312a-4ee8-b452-52af5b5829cb",
+              "name": "Symbol",
+              "value": "={{ $json.symbol }}",
+              "type": "string"
+            },
+            {
+              "id": "b66429b2-1d64-4635-b520-380f656e4ac8",
+              "name": "Price",
+              "value": "={{ $json.filled_avg_price || 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "53170e06-4700-4a40-aff3-b4cf77ce2dcb",
+              "name": "RSI",
+              "value": "={{ $('Merge Data').first().json.rsi }}",
+              "type": "string"
+            },
+            {
+              "id": "b5a97e6d-e416-47da-8bad-0d6d86d2b353",
+              "name": "Side",
+              "value": "={{ $json.side }}",
+              "type": "string"
+            },
+            {
+              "id": "2b07ef17-cd23-45d1-bc89-8770f21b878f",
+              "name": "Sentiment",
+              "value": "={{ $('Merge Data').first().json.candidates[0].content.parts[0].text }}",
+              "type": "string"
+            },
+            {
+              "id": "4f03e92e-08e7-45ab-8c6b-9906558e418f",
+              "name": "Time",
+              "value": "={{ $now.format('yyyy-MM-dd HH:mm') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1840,
+        624
+      ],
+      "id": "a044cfc4-2f51-4c13-a96f-2e08d64fb0f1",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "name",
+          "cachedResultName": "",
+          "cachedResultUrl": ""
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2144,
+        1600
+      ],
+      "id": "fac8665c-3435-445e-8a7e-c6e9579bef11",
+      "name": "Append row in sheet2",
+      "credentials": {
+        "googleApi": {
+          "id": "Mx1kUUCV4SSHFgfo",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8187cd7f-312a-4ee8-b452-52af5b5829cb",
+              "name": "Symbol",
+              "value": "={{ $json.symbol }}",
+              "type": "string"
+            },
+            {
+              "id": "b66429b2-1d64-4635-b520-380f656e4ac8",
+              "name": "Price",
+              "value": "={{ $json.filled_avg_price || 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "53170e06-4700-4a40-aff3-b4cf77ce2dcb",
+              "name": "RSI",
+              "value": "={{ $('Merge Data').first().json.rsi }}",
+              "type": "string"
+            },
+            {
+              "id": "b5a97e6d-e416-47da-8bad-0d6d86d2b353",
+              "name": "Side",
+              "value": "={{ $json.side }}",
+              "type": "string"
+            },
+            {
+              "id": "2b07ef17-cd23-45d1-bc89-8770f21b878f",
+              "name": "Sentiment",
+              "value": "={{ $('Merge Data').first().json.candidates[0].content.parts[0].text }}",
+              "type": "string"
+            },
+            {
+              "id": "4f03e92e-08e7-45ab-8c6b-9906558e418f",
+              "name": "Time",
+              "value": "={{ $now.format('yyyy-MM-dd HH:mm') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1888,
+        1472
+      ],
+      "id": "39ca365b-ddb0-46ce-ba72-bda70004deab",
+      "name": "Edit Fields2"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "name",
+          "cachedResultName": "",
+          "cachedResultUrl": ""
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2208,
+        2208
+      ],
+      "id": "162b6411-5ec0-4d0e-98b3-794f56f3b83d",
+      "name": "Append row in sheet3",
+      "credentials": {
+        "googleApi": {
+          "id": "Mx1kUUCV4SSHFgfo",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8187cd7f-312a-4ee8-b452-52af5b5829cb",
+              "name": "Symbol",
+              "value": "={{ $json.symbol }}",
+              "type": "string"
+            },
+            {
+              "id": "b66429b2-1d64-4635-b520-380f656e4ac8",
+              "name": "Price",
+              "value": "={{ $json.filled_avg_price || 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "53170e06-4700-4a40-aff3-b4cf77ce2dcb",
+              "name": "RSI",
+              "value": "={{ $('Merge Data').first().json.rsi }}",
+              "type": "string"
+            },
+            {
+              "id": "b5a97e6d-e416-47da-8bad-0d6d86d2b353",
+              "name": "Side",
+              "value": "={{ $json.side }}",
+              "type": "string"
+            },
+            {
+              "id": "2b07ef17-cd23-45d1-bc89-8770f21b878f",
+              "name": "Sentiment",
+              "value": "={{ $('Merge Data').first().json.candidates[0].content.parts[0].text }}",
+              "type": "string"
+            },
+            {
+              "id": "4f03e92e-08e7-45ab-8c6b-9906558e418f",
+              "name": "Time",
+              "value": "={{ $now.format('yyyy-MM-dd HH:mm') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2064,
+        2080
+      ],
+      "id": "8c365039-cdf8-44c6-97b6-ab77955b384a",
+      "name": "Edit Fields3"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "name",
+          "cachedResultName": "",
+          "cachedResultUrl": ""
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2272,
+        2784
+      ],
+      "id": "3971286d-7cba-44c0-8be2-590ab27d22c4",
+      "name": "Append row in sheet4",
+      "credentials": {
+        "googleApi": {
+          "id": "Mx1kUUCV4SSHFgfo",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8187cd7f-312a-4ee8-b452-52af5b5829cb",
+              "name": "Symbol",
+              "value": "={{ $json.symbol }}",
+              "type": "string"
+            },
+            {
+              "id": "b66429b2-1d64-4635-b520-380f656e4ac8",
+              "name": "Price",
+              "value": "={{ $json.filled_avg_price || 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "53170e06-4700-4a40-aff3-b4cf77ce2dcb",
+              "name": "RSI",
+              "value": "={{ $('Merge Data').first().json.rsi }}",
+              "type": "string"
+            },
+            {
+              "id": "b5a97e6d-e416-47da-8bad-0d6d86d2b353",
+              "name": "Side",
+              "value": "={{ $json.side }}",
+              "type": "string"
+            },
+            {
+              "id": "2b07ef17-cd23-45d1-bc89-8770f21b878f",
+              "name": "Sentiment",
+              "value": "={{ $('Merge Data').first().json.candidates[0].content.parts[0].text }}",
+              "type": "string"
+            },
+            {
+              "id": "4f03e92e-08e7-45ab-8c6b-9906558e418f",
+              "name": "Time",
+              "value": "={{ $now.format('yyyy-MM-dd HH:mm') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2000,
+        2784
+      ],
+      "id": "75630254-f191-472b-923c-5f838eabff82",
+      "name": "Edit Fields4"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "name",
+          "cachedResultName": "",
+          "cachedResultUrl": ""
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2304,
+        3552
+      ],
+      "id": "a7653b4c-17da-4ac0-85b6-e10f1b235b0d",
+      "name": "Append row in sheet5",
+      "credentials": {
+        "googleApi": {
+          "id": "Mx1kUUCV4SSHFgfo",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8187cd7f-312a-4ee8-b452-52af5b5829cb",
+              "name": "Symbol",
+              "value": "={{ $json.symbol }}",
+              "type": "string"
+            },
+            {
+              "id": "b66429b2-1d64-4635-b520-380f656e4ac8",
+              "name": "Price",
+              "value": "={{ $json.filled_avg_price || 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "53170e06-4700-4a40-aff3-b4cf77ce2dcb",
+              "name": "RSI",
+              "value": "={{ $('Merge Data').first().json.rsi }}",
+              "type": "string"
+            },
+            {
+              "id": "b5a97e6d-e416-47da-8bad-0d6d86d2b353",
+              "name": "Side",
+              "value": "={{ $json.side }}",
+              "type": "string"
+            },
+            {
+              "id": "2b07ef17-cd23-45d1-bc89-8770f21b878f",
+              "name": "Sentiment",
+              "value": "={{ $('Merge Data').first().json.candidates[0].content.parts[0].text }}",
+              "type": "string"
+            },
+            {
+              "id": "4f03e92e-08e7-45ab-8c6b-9906558e418f",
+              "name": "Time",
+              "value": "={{ $now.format('yyyy-MM-dd HH:mm') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2064,
+        3344
+      ],
+      "id": "dd20f580-eb64-4e90-93f5-09d8f5daa685",
+      "name": "Edit Fields5"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "name",
+          "cachedResultName": "",
+          "cachedResultUrl": ""
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2320,
+        4128
+      ],
+      "id": "ce10b6f5-481d-4ee8-b9a8-b0e56b8acb20",
+      "name": "Append row in sheet6",
+      "credentials": {
+        "googleApi": {
+          "id": "Mx1kUUCV4SSHFgfo",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8187cd7f-312a-4ee8-b452-52af5b5829cb",
+              "name": "Symbol",
+              "value": "={{ $json.symbol }}",
+              "type": "string"
+            },
+            {
+              "id": "b66429b2-1d64-4635-b520-380f656e4ac8",
+              "name": "Price",
+              "value": "={{ $json.filled_avg_price || 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "53170e06-4700-4a40-aff3-b4cf77ce2dcb",
+              "name": "RSI",
+              "value": "={{ $('Merge Data').first().json.rsi }}",
+              "type": "string"
+            },
+            {
+              "id": "b5a97e6d-e416-47da-8bad-0d6d86d2b353",
+              "name": "Side",
+              "value": "={{ $json.side }}",
+              "type": "string"
+            },
+            {
+              "id": "2b07ef17-cd23-45d1-bc89-8770f21b878f",
+              "name": "Sentiment",
+              "value": "={{ $('Merge Data').first().json.candidates[0].content.parts[0].text }}",
+              "type": "string"
+            },
+            {
+              "id": "4f03e92e-08e7-45ab-8c6b-9906558e418f",
+              "name": "Time",
+              "value": "={{ $now.format('yyyy-MM-dd HH:mm') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2048,
+        4176
+      ],
+      "id": "870c2647-1a2b-4bec-9591-bbaa9ff0ab26",
+      "name": "Edit Fields6"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "name",
+          "cachedResultName": "",
+          "cachedResultUrl": ""
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2272,
+        4672
+      ],
+      "id": "0bc66811-8ea8-4d9e-a457-925bd7b05a54",
+      "name": "Append row in sheet7",
+      "credentials": {
+        "googleApi": {
+          "id": "Mx1kUUCV4SSHFgfo",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8187cd7f-312a-4ee8-b452-52af5b5829cb",
+              "name": "Symbol",
+              "value": "={{ $json.symbol }}",
+              "type": "string"
+            },
+            {
+              "id": "b66429b2-1d64-4635-b520-380f656e4ac8",
+              "name": "Price",
+              "value": "={{ $json.filled_avg_price || 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "53170e06-4700-4a40-aff3-b4cf77ce2dcb",
+              "name": "RSI",
+              "value": "={{ $('Merge Data').first().json.rsi }}",
+              "type": "string"
+            },
+            {
+              "id": "b5a97e6d-e416-47da-8bad-0d6d86d2b353",
+              "name": "Side",
+              "value": "={{ $json.side }}",
+              "type": "string"
+            },
+            {
+              "id": "2b07ef17-cd23-45d1-bc89-8770f21b878f",
+              "name": "Sentiment",
+              "value": "={{ $('Merge Data').first().json.candidates[0].content.parts[0].text }}",
+              "type": "string"
+            },
+            {
+              "id": "4f03e92e-08e7-45ab-8c6b-9906558e418f",
+              "name": "Time",
+              "value": "={{ $now.format('yyyy-MM-dd HH:mm') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1968,
+        4752
+      ],
+      "id": "0b304eda-7f93-48ed-b61f-aa0e956b2402",
+      "name": "Edit Fields7"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "symbol",
+              "name": "Symbol",
+              "value": "={{ $('Get RSI (AlphaVantage)').item.json['Meta Data']['1: Symbol'] }}",
+              "type": "string"
+            },
+            {
+              "id": "side",
+              "name": "Side",
+              "value": "WAIT",
+              "type": "string"
+            },
+            {
+              "id": "price",
+              "name": "Price",
+              "value": 0,
+              "type": "number"
+            },
+            {
+              "id": "time",
+              "name": "Time",
+              "value": "={{ $now.format('yyyy-MM-dd HH:mm') }}",
+              "type": "string"
+            },
+            {
+              "id": "rsi",
+              "name": "RSI",
+              "value": "={{ $json.rsi }}",
+              "type": "number"
+            },
+            {
+              "id": "sentiment",
+              "name": "Sentiment",
+              "value": "={{ parseFloat($json.candidates[0].content.parts[0].text) }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Format WAIT Log",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1360,
+        144
+      ],
+      "id": "f511acb8-6d0a-44c2-8c9f-e00849960698"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "name",
+          "cachedResultName": "",
+          "cachedResultUrl": ""
+        }
+      },
+      "name": "Log WAIT to Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        1600,
+        96
+      ],
+      "notesInFlow": true,
+      "id": "c85bddfb-5427-41cc-a433-87347bbdc4ca",
+      "credentials": {
+        "googleApi": {
+          "id": "Mx1kUUCV4SSHFgfo",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Select 'Trading Bot Logs' Sheet"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "symbol",
+              "name": "Symbol",
+              "value": "={{ $('Get RSI (AlphaVantage)1').item.json['Meta Data']['1: Symbol'] }}",
+              "type": "string"
+            },
+            {
+              "id": "side",
+              "name": "Side",
+              "value": "WAIT",
+              "type": "string"
+            },
+            {
+              "id": "price",
+              "name": "Price",
+              "value": 0,
+              "type": "number"
+            },
+            {
+              "id": "time",
+              "name": "Time",
+              "value": "={{ $now.format('yyyy-MM-dd HH:mm') }}",
+              "type": "string"
+            },
+            {
+              "id": "rsi",
+              "name": "RSI",
+              "value": "={{ $json.rsi }}",
+              "type": "number"
+            },
+            {
+              "id": "sentiment",
+              "name": "Sentiment",
+              "value": "={{ parseFloat($json.candidates[0].content.parts[0].text) }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Format WAIT Log1",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1408,
+        784
+      ],
+      "id": "7be423cf-bfd2-4963-aed2-b75b8e911b74"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "name",
+          "cachedResultName": "",
+          "cachedResultUrl": ""
+        }
+      },
+      "name": "Log WAIT to Sheet1",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        1648,
+        736
+      ],
+      "notesInFlow": true,
+      "id": "6f388247-42ad-4e46-8927-29e3f34f5297",
+      "credentials": {
+        "googleApi": {
+          "id": "Mx1kUUCV4SSHFgfo",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Select 'Trading Bot Logs' Sheet"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "symbol",
+              "name": "Symbol",
+              "value": "={{ $('Get RSI (AlphaVantage)2').item.json['Meta Data']['1: Symbol'] }}",
+              "type": "string"
+            },
+            {
+              "id": "side",
+              "name": "Side",
+              "value": "WAIT",
+              "type": "string"
+            },
+            {
+              "id": "price",
+              "name": "Price",
+              "value": 0,
+              "type": "number"
+            },
+            {
+              "id": "time",
+              "name": "Time",
+              "value": "={{ $now.format('yyyy-MM-dd HH:mm') }}",
+              "type": "string"
+            },
+            {
+              "id": "rsi",
+              "name": "RSI",
+              "value": "={{ $json.rsi }}",
+              "type": "number"
+            },
+            {
+              "id": "sentiment",
+              "name": "Sentiment",
+              "value": "={{ parseFloat($json.candidates[0].content.parts[0].text) }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Format WAIT Log2",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1456,
+        1584
+      ],
+      "id": "ef1d0a7c-af44-4116-8377-8dde61da9759"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "name",
+          "cachedResultName": "",
+          "cachedResultUrl": ""
+        }
+      },
+      "name": "Log WAIT to Sheet2",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        1696,
+        1536
+      ],
+      "notesInFlow": true,
+      "id": "c2101c48-818d-451d-9737-88e6865abe3a",
+      "credentials": {
+        "googleApi": {
+          "id": "Mx1kUUCV4SSHFgfo",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Select 'Trading Bot Logs' Sheet"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "symbol",
+              "name": "Symbol",
+              "value": "={{ $('Get RSI (AlphaVantage)3').item.json['Meta Data']['1: Symbol'] }}",
+              "type": "string"
+            },
+            {
+              "id": "side",
+              "name": "Side",
+              "value": "WAIT",
+              "type": "string"
+            },
+            {
+              "id": "price",
+              "name": "Price",
+              "value": 0,
+              "type": "number"
+            },
+            {
+              "id": "time",
+              "name": "Time",
+              "value": "={{ $now.format('yyyy-MM-dd HH:mm') }}",
+              "type": "string"
+            },
+            {
+              "id": "rsi",
+              "name": "RSI",
+              "value": "={{ $json.rsi }}",
+              "type": "number"
+            },
+            {
+              "id": "sentiment",
+              "name": "Sentiment",
+              "value": "={{ parseFloat($json.candidates[0].content.parts[0].text) }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Format WAIT Log3",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1488,
+        2288
+      ],
+      "id": "e84d42e1-c00c-407b-9f68-d1d6d44b45bb"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "name",
+          "cachedResultName": "",
+          "cachedResultUrl": ""
+        }
+      },
+      "name": "Log WAIT to Sheet3",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        1696,
+        2320
+      ],
+      "notesInFlow": true,
+      "id": "37ec4c32-9ff8-45bf-ab44-c1855aca8bd3",
+      "credentials": {
+        "googleApi": {
+          "id": "Mx1kUUCV4SSHFgfo",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Select 'Trading Bot Logs' Sheet"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "symbol",
+              "name": "Symbol",
+              "value": "={{ $('Get RSI (AlphaVantage)4').item.json['Meta Data']['1: Symbol'] }}",
+              "type": "string"
+            },
+            {
+              "id": "side",
+              "name": "Side",
+              "value": "WAIT",
+              "type": "string"
+            },
+            {
+              "id": "price",
+              "name": "Price",
+              "value": 0,
+              "type": "number"
+            },
+            {
+              "id": "time",
+              "name": "Time",
+              "value": "={{ $now.format('yyyy-MM-dd HH:mm') }}",
+              "type": "string"
+            },
+            {
+              "id": "rsi",
+              "name": "RSI",
+              "value": "={{ $json.rsi }}",
+              "type": "number"
+            },
+            {
+              "id": "sentiment",
+              "name": "Sentiment",
+              "value": "={{ parseFloat($json.candidates[0].content.parts[0].text) }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Format WAIT Log4",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1488,
+        2944
+      ],
+      "id": "b6a1bab4-9597-4b85-ab65-430b0cab888f"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "name",
+          "cachedResultName": "",
+          "cachedResultUrl": ""
+        }
+      },
+      "name": "Log WAIT to Sheet4",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        1728,
+        2896
+      ],
+      "notesInFlow": true,
+      "id": "0ad9bbe1-9741-41e6-ae28-2803d452dcd9",
+      "credentials": {
+        "googleApi": {
+          "id": "Mx1kUUCV4SSHFgfo",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Select 'Trading Bot Logs' Sheet"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "symbol",
+              "name": "Symbol",
+              "value": "={{ $('Get RSI (AlphaVantage)5').item.json['Meta Data']['1: Symbol'] }}",
+              "type": "string"
+            },
+            {
+              "id": "side",
+              "name": "Side",
+              "value": "WAIT",
+              "type": "string"
+            },
+            {
+              "id": "price",
+              "name": "Price",
+              "value": 0,
+              "type": "number"
+            },
+            {
+              "id": "time",
+              "name": "Time",
+              "value": "={{ $now.format('yyyy-MM-dd HH:mm') }}",
+              "type": "string"
+            },
+            {
+              "id": "rsi",
+              "name": "RSI",
+              "value": "={{ $json.rsi }}",
+              "type": "number"
+            },
+            {
+              "id": "sentiment",
+              "name": "Sentiment",
+              "value": "={{ parseFloat($json.candidates[0].content.parts[0].text) }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Format WAIT Log5",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1568,
+        3664
+      ],
+      "id": "20e03619-ec6e-474e-8392-4370838c52fb"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "name",
+          "cachedResultName": "",
+          "cachedResultUrl": ""
+        }
+      },
+      "name": "Log WAIT to Sheet5",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        1808,
+        3616
+      ],
+      "notesInFlow": true,
+      "id": "a2393513-9666-44eb-8973-807f51cbbac6",
+      "credentials": {
+        "googleApi": {
+          "id": "Mx1kUUCV4SSHFgfo",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Select 'Trading Bot Logs' Sheet"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "symbol",
+              "name": "Symbol",
+              "value": "={{ $('Get RSI (AlphaVantage)6').item.json['Meta Data']['1: Symbol'] }}",
+              "type": "string"
+            },
+            {
+              "id": "side",
+              "name": "Side",
+              "value": "WAIT",
+              "type": "string"
+            },
+            {
+              "id": "price",
+              "name": "Price",
+              "value": 0,
+              "type": "number"
+            },
+            {
+              "id": "time",
+              "name": "Time",
+              "value": "={{ $now.format('yyyy-MM-dd HH:mm') }}",
+              "type": "string"
+            },
+            {
+              "id": "rsi",
+              "name": "RSI",
+              "value": "={{ $json.rsi }}",
+              "type": "number"
+            },
+            {
+              "id": "sentiment",
+              "name": "Sentiment",
+              "value": "={{ parseFloat($json.candidates[0].content.parts[0].text) }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Format WAIT Log6",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1520,
+        4304
+      ],
+      "id": "34597a84-eb12-4317-8f55-0f451738462e"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "name",
+          "cachedResultName": "",
+          "cachedResultUrl": ""
+        }
+      },
+      "name": "Log WAIT to Sheet6",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        1760,
+        4256
+      ],
+      "notesInFlow": true,
+      "id": "6d96b649-565e-4d9d-9abb-81ae9519e806",
+      "credentials": {
+        "googleApi": {
+          "id": "Mx1kUUCV4SSHFgfo",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Select 'Trading Bot Logs' Sheet"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "symbol",
+              "name": "Symbol",
+              "value": "={{ $('Get RSI (AlphaVantage)7').item.json['Meta Data']['1: Symbol'] }}",
+              "type": "string"
+            },
+            {
+              "id": "side",
+              "name": "Side",
+              "value": "WAIT",
+              "type": "string"
+            },
+            {
+              "id": "price",
+              "name": "Price",
+              "value": 0,
+              "type": "number"
+            },
+            {
+              "id": "time",
+              "name": "Time",
+              "value": "={{ $now.format('yyyy-MM-dd HH:mm') }}",
+              "type": "string"
+            },
+            {
+              "id": "rsi",
+              "name": "RSI",
+              "value": "={{ $json.rsi }}",
+              "type": "number"
+            },
+            {
+              "id": "sentiment",
+              "name": "Sentiment",
+              "value": "={{ parseFloat($json.candidates[0].content.parts[0].text) }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Format WAIT Log7",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1472,
+        4944
+      ],
+      "id": "0e24a879-f194-4da6-a1e6-ab15b1820a23"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "name",
+          "cachedResultName": "",
+          "cachedResultUrl": ""
+        }
+      },
+      "name": "Log WAIT to Sheet7",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        1712,
+        4896
+      ],
+      "notesInFlow": true,
+      "id": "2149bc15-81ec-4dae-9a7b-2d1f3f3e3809",
+      "credentials": {
+        "googleApi": {
+          "id": "Mx1kUUCV4SSHFgfo",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Select 'Trading Bot Logs' Sheet"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Get RSI (AlphaVantage)": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get News (NewsAPI)": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Data": {
+      "main": [
+        [
+          {
+            "node": "Check Conditions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Conditions": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Conditions1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Merge Data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Merge Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Conditions1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format WAIT Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Schedule": {
+      "main": [
+        [
+          {
+            "node": "Get RSI (AlphaVantage)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get News (NewsAPI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get RSI (AlphaVantage)1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get News (NewsAPI)1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Data1": {
+      "main": [
+        [
+          {
+            "node": "Check Conditions2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Conditions2": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Conditions3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request3": {
+      "main": [
+        [
+          {
+            "node": "Merge Data1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Merge Data1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Conditions3": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request5",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format WAIT Log1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Schedule1": {
+      "main": [
+        [
+          {
+            "node": "Get RSI (AlphaVantage)1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get News (NewsAPI)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get RSI (AlphaVantage)2": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get News (NewsAPI)2": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Data2": {
+      "main": [
+        [
+          {
+            "node": "Check Conditions4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Conditions4": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request7",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Conditions5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request6": {
+      "main": [
+        [
+          {
+            "node": "Merge Data2",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Merge Data2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Conditions5": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request8",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format WAIT Log2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Schedule2": {
+      "main": [
+        [
+          {
+            "node": "Get RSI (AlphaVantage)2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get News (NewsAPI)2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get RSI (AlphaVantage)3": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get News (NewsAPI)3": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Data3": {
+      "main": [
+        [
+          {
+            "node": "Check Conditions6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Conditions6": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request10",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Conditions7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request9": {
+      "main": [
+        [
+          {
+            "node": "Merge Data3",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "Merge Data3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Conditions7": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request11",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format WAIT Log3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Schedule3": {
+      "main": [
+        [
+          {
+            "node": "Get RSI (AlphaVantage)3",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get News (NewsAPI)3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get RSI (AlphaVantage)4": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get News (NewsAPI)4": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request12",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Data4": {
+      "main": [
+        [
+          {
+            "node": "Check Conditions8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Conditions8": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request13",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Conditions9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request12": {
+      "main": [
+        [
+          {
+            "node": "Merge Data4",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript4": {
+      "main": [
+        [
+          {
+            "node": "Merge Data4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Conditions9": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request14",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format WAIT Log4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Schedule4": {
+      "main": [
+        [
+          {
+            "node": "Get RSI (AlphaVantage)4",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get News (NewsAPI)4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get RSI (AlphaVantage)5": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get News (NewsAPI)5": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request15",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Data5": {
+      "main": [
+        [
+          {
+            "node": "Check Conditions10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Conditions10": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request16",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Conditions11",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request15": {
+      "main": [
+        [
+          {
+            "node": "Merge Data5",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript5": {
+      "main": [
+        [
+          {
+            "node": "Merge Data5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Conditions11": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request17",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format WAIT Log5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Schedule5": {
+      "main": [
+        [
+          {
+            "node": "Get RSI (AlphaVantage)5",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get News (NewsAPI)5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get RSI (AlphaVantage)6": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get News (NewsAPI)6": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request18",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Data6": {
+      "main": [
+        [
+          {
+            "node": "Check Conditions12",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Conditions12": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request19",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Conditions13",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request18": {
+      "main": [
+        [
+          {
+            "node": "Merge Data6",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript6": {
+      "main": [
+        [
+          {
+            "node": "Merge Data6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Conditions13": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request20",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format WAIT Log6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Schedule6": {
+      "main": [
+        [
+          {
+            "node": "Get RSI (AlphaVantage)6",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get News (NewsAPI)6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get RSI (AlphaVantage)7": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get News (NewsAPI)7": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request21",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Data7": {
+      "main": [
+        [
+          {
+            "node": "Check Conditions14",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Conditions14": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request22",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Conditions15",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request21": {
+      "main": [
+        [
+          {
+            "node": "Merge Data7",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript7": {
+      "main": [
+        [
+          {
+            "node": "Merge Data7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Conditions15": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request23",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format WAIT Log7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Schedule7": {
+      "main": [
+        [
+          {
+            "node": "Get RSI (AlphaVantage)7",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get News (NewsAPI)7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        []
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request2": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request4": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request5": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields2": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request7": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request8": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields3": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request10": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request11": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields4": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request13": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request14": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields5": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request16": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request17": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields6": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request19": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request20": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields7": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request22": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request23": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format WAIT Log": {
+      "main": [
+        [
+          {
+            "node": "Log WAIT to Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format WAIT Log1": {
+      "main": [
+        [
+          {
+            "node": "Log WAIT to Sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format WAIT Log2": {
+      "main": [
+        [
+          {
+            "node": "Log WAIT to Sheet2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format WAIT Log3": {
+      "main": [
+        [
+          {
+            "node": "Log WAIT to Sheet3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format WAIT Log4": {
+      "main": [
+        [
+          {
+            "node": "Log WAIT to Sheet4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format WAIT Log5": {
+      "main": [
+        [
+          {
+            "node": "Log WAIT to Sheet5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format WAIT Log6": {
+      "main": [
+        [
+          {
+            "node": "Log WAIT to Sheet6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format WAIT Log7": {
+      "main": [
+        [
+          {
+            "node": "Log WAIT to Sheet7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "88d0e722-8c0f-4ac2-90c2-11c6a0c07d03",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3fae2ec6c1e361b484ba9074c5216bbfb8f5ed83af5077931ee442d0c5571a77"
+  },
+  "id": "IjAHPRperkjVKo5a",
+  "tags": []
+}

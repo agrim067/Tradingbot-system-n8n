@@ -1,0 +1,203 @@
+{
+  "name": "Dashboard Data API",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "dashboard-data",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook (GET Data)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        1296,
+        224
+      ],
+      "webhookId": "dashboard-data",
+      "id": "705bd471-00d7-4430-8bf4-50bbae8296a7"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "name",
+          "cachedResultName": "",
+          "cachedResultUrl": ""
+        }
+      },
+      "name": "Read Trading Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        1744,
+        224
+      ],
+      "notesInFlow": true,
+      "id": "7a43dea3-e3f1-411d-90d0-31b7d05e51ce",
+      "credentials": {
+        "googleApi": {
+          "id": "Mx1kUUCV4SSHFgfo",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Select your 'Trading Bot Logs' sheet."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "name": "Send JSON Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        2176,
+        240
+      ],
+      "id": "c15dc3ed-4239-4512-978f-e8d8eabb6ae7"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Get Alpaca Data\n// We look specifically for the node named \"Get Account (Alpaca)\"\nlet alpaca = {};\ntry {\n  alpaca = $('Get Account (Alpaca)').first().json;\n} catch (error) {\n  // Fallback if the node name is wrong or data is missing\n  alpaca = { equity: 100000, last_equity: 100000 };\n}\n\n// 2. Calculate Money\nconst currentEquity = parseFloat(alpaca.equity || 100000);\n\n// CALCULATE TOTAL P/L: (Current Money - Starting Paper Balance)\n// This ensures you see the -$0.02 even if the day hasn't changed\nconst totalPL = currentEquity - 100000;\n\n// 3. Get Trade Logs (from Google Sheets input)\nconst tradeLogs = items.map(item => item.json);\n\n// 4. Output the combined data structure\nreturn [\n  {\n    json: { \n      account: {\n          equity: currentEquity,\n          pl: totalPL\n      },\n      logs: tradeLogs \n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2080,
+        512
+      ],
+      "id": "fc2eab06-c8a2-4236-b2de-85457169ac63",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1856,
+        512
+      ],
+      "id": "dcb59fed-36ef-4f1c-9e91-c56a1557993b",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "url": "https://paper-api.alpaca.markets/v2/account",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "APCA-API-KEY-ID"
+            },
+            {
+              "name": "APCA-API-SECRET-KEY"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get Account (Alpaca)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1520,
+        224
+      ],
+      "notesInFlow": true,
+      "id": "b8175aed-4192-4e81-ace5-5aadb3c99ffd",
+      "notes": "Fetching your Equity & P/L"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook (GET Data)": {
+      "main": [
+        [
+          {
+            "node": "Get Account (Alpaca)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Trading Log": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Send JSON Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Account (Alpaca)": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Trading Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "2b4502d1-7955-4456-a13c-bc05d9a92c43",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3fae2ec6c1e361b484ba9074c5216bbfb8f5ed83af5077931ee442d0c5571a77"
+  },
+  "id": "y4LQqGmQ5k345aY7",
+  "tags": []
+}

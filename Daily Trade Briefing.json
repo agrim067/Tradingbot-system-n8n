@@ -1,0 +1,219 @@
+{
+  "name": "Daily Trade Briefing",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "15 10 * * 1-5"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "15 16 * * 1-5"
+            }
+          ]
+        }
+      },
+      "name": "Schedule (Post-Trade)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        1312,
+        64
+      ],
+      "id": "b33c14a8-0e54-4ec5-b397-cbe553ae01c7"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "name",
+          "cachedResultName": "",
+          "cachedResultUrl": ""
+        }
+      },
+      "name": "Get Last 8 Logs",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        1536,
+        64
+      ],
+      "notesInFlow": true,
+      "id": "7e381c98-bb24-4b82-9588-f71eda73aa92",
+      "credentials": {
+        "googleApi": {
+          "id": "Mx1kUUCV4SSHFgfo",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "1. Select 'Trading Bot Logs'.\n2. This pulls the last 8 decisions (Buy/Wait)."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Convert the 8 rows into a clean text summary for Perplexity\nconst logs = items.map(i => i.json);\n\nlet summary = \"Here is the data from my trading bot run today:\\n\";\n\nlogs.forEach(log => {\n  summary += `- ${log.Symbol}: RSI ${log.RSI}, Sentiment ${log.Sentiment} (Decision: ${log.Side})\\n`;\n});\n\n// Pass both the text summary and the raw logs for the email later\nreturn [{ \n  json: { \n    prompt: summary,\n    raw_logs: logs\n  } \n}];"
+      },
+      "name": "Format for AI",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        64
+      ],
+      "id": "e48de4ca-1dcc-4a42-ac9c-a22e1a5bf96f"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.perplexity.ai/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({\n  \"model\": \"sonar\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a financial analyst. Review the provided trading bot signals (RSI and Sentiment scores). For any stock with a Sentiment score below 0.4 or above 0.7, search the web for news from the last 24 hours to explain WHY. Provide a bulleted summary of the news driving these specific scores. Ignore stocks with neutral sentiment.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": $json.prompt\n    }\n  ]\n}) }}",
+        "options": {}
+      },
+      "name": "Ask Perplexity",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1984,
+        64
+      ],
+      "notesInFlow": true,
+      "id": "95cefea9-3e18-41ca-b69f-6b6fad01a597",
+      "notes": "Model: sonar\n(Standard reliable model)"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "multiplex",
+        "options": {}
+      },
+      "name": "Merge Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        2192,
+        64
+      ],
+      "id": "8395b837-283e-4356-b299-1b7abd529553"
+    },
+    {
+      "parameters": {
+        "subject": "📊 Daily Trading Bot Report",
+        "message": "=<h2>Trading Bot Summary</h2>\n<p>The bot has finished its scheduled run. Here are the AI insights based on the sentiment scores:</p>\n<hr>\n<h3>🤖 Perplexity Market Analysis</h3>\n<div style=\"background-color: #f5f5f5; padding: 15px; border-radius: 5px;\">\n{{ $json.choices && $json.choices[0] ? $json.choices[0].message.content.replace(/\\n/g, '<br>') : '⚠️ Analysis Unavailable (Check Perplexity Node)' }}\n</div>\n<hr>\n<h3>📋 Raw Logs</h3>\n<pre>{{ $json.prompt }}</pre>",
+        "options": {}
+      },
+      "name": "Send Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2416,
+        64
+      ],
+      "webhookId": "gmail-sender",
+      "id": "4fc18a05-cb08-441e-b329-0e030f56965b",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "XGR6qR8kmFFGpfkK",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule (Post-Trade)": {
+      "main": [
+        [
+          {
+            "node": "Get Last 8 Logs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Last 8 Logs": {
+      "main": [
+        [
+          {
+            "node": "Format for AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format for AI": {
+      "main": [
+        [
+          {
+            "node": "Ask Perplexity",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Ask Perplexity": {
+      "main": [
+        [
+          {
+            "node": "Merge Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Results": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "de217c57-f73a-4baf-8c45-27ad63039280",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3fae2ec6c1e361b484ba9074c5216bbfb8f5ed83af5077931ee442d0c5571a77"
+  },
+  "id": "hzOBuI8WefLC3ebs",
+  "tags": []
+}

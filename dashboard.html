@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SYSTEM_COMMAND_V3</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --matrix-green: #0f0;
+            --matrix-dark: #001a00;
+            --terminal-bg: #0c0c0c;
+            --border-color: #333;
+        }
+        body { 
+            background-color: var(--terminal-bg); 
+            color: var(--matrix-green); 
+            font-family: 'JetBrains Mono', monospace; 
+            overflow: hidden;
+            text-shadow: 0 0 2px rgba(0, 255, 0, 0.4);
+        }
+        
+        /* CRT Scanline Effect */
+        body::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 50;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #000; border-left: 1px solid #111; }
+        ::-webkit-scrollbar-thumb { background: #004400; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--matrix-green); }
+
+        /* Utilities */
+        .log-entry { border-bottom: 1px solid #1a1a1a; transition: background 0.2s; }
+        .log-entry:hover { background-color: #111; }
+        .active-stock { background-color: rgba(0, 255, 0, 0.15); border-left: 2px solid var(--matrix-green); }
+        
+        /* Meters */
+        .meter-bg { background: #1a1a1a; height: 6px; border-radius: 3px; overflow: hidden; }
+        .meter-fill { height: 100%; transition: width 0.5s ease; }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+
+    <!-- Top Bar -->
+    <header class="border-b border-[#333] p-3 flex justify-between items-center bg-black z-40">
+        <div class="flex items-center gap-4">
+            <div class="border border-green-900 px-2 py-1 text-xs font-bold bg-green-900/20">SYS.ROOT</div>
+            <h1 class="text-sm tracking-widest font-bold">MAG_7_QUANT_PROTOCOL_V3</h1>
+        </div>
+        <div class="flex gap-6 text-xs font-mono">
+            <div>EQ: <span id="equity-val" class="text-white">LOADING</span></div>
+            <div>P/L: <span id="pl-val" class="text-gray-500">...</span></div>
+            <div>RET: <span id="roi-val" class="text-gray-500">...</span></div>
+            <div id="status-indicator" class="flex items-center gap-2 text-red-500">
+                <span class="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span> OFFLINE
+            </div>
+        </div>
+    </header>
+
+    <div class="flex-1 flex overflow-hidden relative">
+        
+        <!-- Left Panel: Targets -->
+        <aside class="w-64 border-r border-[#333] flex flex-col bg-black z-30">
+            <div class="p-2 border-b border-[#333] text-[10px] text-gray-500 uppercase">Target_Assets</div>
+            <div id="stock-list" class="flex-1 overflow-y-auto p-2 space-y-1"></div>
+        </aside>
+
+        <!-- Center: The Chart & Metrics -->
+        <main class="flex-1 bg-[#050505] relative z-20 flex flex-col">
+            
+            <!-- TradingView Chart (70% Height) -->
+            <div class="h-[70%] relative">
+                <div id="tv_chart_container" class="w-full h-full"></div>
+                
+                <!-- Floating Stats Overlay (Restored) -->
+                <div class="absolute top-4 right-4 bg-black/80 border border-[#333] p-4 text-xs font-mono backdrop-blur-sm pointer-events-none z-10">
+                    <div class="text-gray-500 mb-1">CURRENT_TARGET</div>
+                    <div id="overlay-symbol" class="text-lg font-bold text-white mb-2">LOADING</div>
+                    <div class="grid grid-cols-2 gap-x-6 gap-y-1">
+                        <span class="text-gray-500">ALGO_MODE:</span> <span class="text-green-400">SWING</span>
+                        <span class="text-gray-500">TIMEFRAME:</span> <span class="text-green-400">DAILY</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- New Metrics Panel (30% Height) -->
+            <div class="h-[30%] border-t border-[#333] bg-[#0c0c0c] p-4 flex gap-8">
+                
+                <!-- RSI Meter -->
+                <div class="flex-1 flex flex-col justify-center">
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-gray-500">RSI (Relative Strength Index)</span>
+                        <span id="rsi-display" class="font-bold text-white">--</span>
+                    </div>
+                    <!-- The Bar -->
+                    <div class="meter-bg relative">
+                        <!-- Zones -->
+                        <div class="absolute left-0 top-0 bottom-0 w-[30%] bg-green-900/30 z-0"></div> <!-- Oversold (Buy) -->
+                        <div class="absolute right-0 top-0 bottom-0 w-[30%] bg-red-900/30 z-0"></div> <!-- Overbought (Sell) -->
+                        
+                        <!-- The Indicator -->
+                        <div id="rsi-bar" class="meter-fill bg-blue-500 relative z-10" style="width: 50%"></div>
+                    </div>
+                    <div class="flex justify-between text-[9px] text-gray-600 mt-1">
+                        <span>0 (OVERSOLD)</span>
+                        <span>50</span>
+                        <span>100 (OVERBOUGHT)</span>
+                    </div>
+                    <div class="text-[10px] text-gray-500 mt-2">
+                        STRATEGY: Buy if <span class="text-green-400">< 30</span> • Sell if <span class="text-red-400">> 70</span>
+                    </div>
+                </div>
+
+                <!-- Sentiment Meter -->
+                <div class="flex-1 flex flex-col justify-center">
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-gray-500">AI News Sentiment</span>
+                        <span id="sent-display" class="font-bold text-white">--</span>
+                    </div>
+                    <div class="meter-bg">
+                        <div id="sent-bar" class="meter-fill bg-blue-500" style="width: 50%"></div>
+                    </div>
+                    <div class="flex justify-between text-[9px] text-gray-600 mt-1">
+                        <span>0.0 (NEGATIVE)</span>
+                        <span>0.5 (NEUTRAL)</span>
+                        <span>1.0 (POSITIVE)</span>
+                    </div>
+                    <div class="text-[10px] text-gray-500 mt-2">
+                        STRATEGY: Buy if <span class="text-green-400">> 0.50</span> • Sell if <span class="text-red-400">< 0.40</span>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+
+        <!-- Right Panel: System Logs -->
+        <aside class="w-96 border-l border-[#333] flex flex-col bg-black z-30">
+            <div class="p-2 border-b border-[#333] flex justify-between items-center">
+                <span class="text-[10px] text-gray-500 uppercase">EXECUTION_LOGS</span>
+                <button onclick="fetchData()" class="text-[10px] hover:text-white border border-[#333] px-2 hover:bg-[#222]">REFRESH</button>
+            </div>
+            
+            <div id="console-logs" class="flex-1 overflow-y-auto font-mono text-xs p-0">
+                <div class="p-4 text-gray-600 italic">Waiting for n8n uplink...</div>
+            </div>
+        </aside>
+
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const N8N_URL = 'http://localhost:5678/webhook/dashboard-data';
+        
+        const assets = [
+            { s: "NASDAQ:AAPL", d: "AAPL", n: "Apple_Inc" },
+            { s: "NASDAQ:MSFT", d: "MSFT", n: "Microsoft_Corp" },
+            { s: "NASDAQ:NVDA", d: "NVDA", n: "Nvidia_Corp" },
+            { s: "NASDAQ:AMD",  d: "AMD",  n: "Adv_Micro_Dev" },
+            { s: "NASDAQ:AMZN", d: "AMZN", n: "Amazon_Com" },
+            { s: "NASDAQ:GOOGL", d: "GOOGL", n: "Alphabet_Inc" },
+            { s: "NASDAQ:META", d: "META", n: "Meta_Platforms" },
+            { s: "NASDAQ:TSLA", d: "TSLA", n: "Tesla_Motors" }
+        ];
+
+        let activeSymbol = "NASDAQ:AAPL";
+        let latestDataMap = {}; // Stores the latest stats for each symbol
+
+        // --- INIT ---
+        window.addEventListener('DOMContentLoaded', () => {
+            renderSidebar();
+            initChart(activeSymbol);
+            fetchData();
+            
+            // Auto-refresh logs every 30s
+            setInterval(fetchData, 30000);
+        });
+
+        // --- FETCH DATA ---
+        async function fetchData() {
+            const statusEl = document.getElementById('status-indicator');
+            try {
+                const res = await fetch(N8N_URL);
+                if (!res.ok) throw new Error("HTTP_ERR");
+                const responseData = await res.json();
+                
+                let logs = [];
+                let account = { equity: 100000, pl: 0 }; 
+
+                if (Array.isArray(responseData)) {
+                    logs = responseData;
+                } else {
+                    logs = responseData.logs || [];
+                    if (responseData.account) account = responseData.account;
+                }
+                
+                // Process logs to find latest stats per symbol
+                logs.forEach(log => {
+                    // Assuming 'Symbol' is the key in your Google Sheet
+                    if (log.Symbol) {
+                        latestDataMap[log.Symbol] = {
+                            rsi: parseFloat(log.RSI || 50),
+                            sentiment: parseFloat(log.Sentiment || 0.5)
+                        };
+                    }
+                });
+
+                renderLogs(logs.reverse());
+                updateAccountStats(account);
+                updateMeters(activeSymbol); // Update meters for currently selected stock
+
+                statusEl.innerHTML = `<span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> ONLINE`;
+                statusEl.className = "flex items-center gap-2 text-green-500";
+            } catch (err) {
+                console.warn("Uplink Failed. Utilizing Simulation Data.");
+                
+                statusEl.innerHTML = `<span class="w-2 h-2 bg-red-500 rounded-full"></span> CONNECTION LOST`;
+                statusEl.className = "flex items-center gap-2 text-red-500";
+                
+                // Fallback Mock Data
+                const mockAccount = { equity: 104520.50, pl: 4520.50 };
+                const mockLogs = [
+                     { Time: "10:05", Symbol: "TSLA", Side: "buy", Price: "395.20", RSI: "28.4", Sentiment: "0.92" },
+                     { Time: "10:04", Symbol: "GOOGL", Side: "WAIT", Price: "0", RSI: "55.2", Sentiment: "0.40" }
+                ];
+                
+                // Populate mock map
+                latestDataMap['TSLA'] = { rsi: 28.4, sentiment: 0.92 };
+                latestDataMap['GOOGL'] = { rsi: 55.2, sentiment: 0.40 };
+                latestDataMap['AAPL'] = { rsi: 25.0, sentiment: 0.85 };
+
+                renderLogs(mockLogs, true); 
+                updateAccountStats(mockAccount);
+                updateMeters(activeSymbol);
+            }
+        }
+
+        // --- UPDATE METERS ---
+        function updateMeters(symbolKey) {
+            // Extract just the ticker (e.g., "AAPL" from "NASDAQ:AAPL")
+            const ticker = symbolKey.split(':')[1];
+            const data = latestDataMap[ticker] || { rsi: 50, sentiment: 0.5 }; // Default neutral
+
+            // Update RSI
+            const rsiVal = data.rsi;
+            const rsiBar = document.getElementById('rsi-bar');
+            const rsiText = document.getElementById('rsi-display');
+            
+            rsiBar.style.width = `${rsiVal}%`;
+            rsiText.innerText = rsiVal.toFixed(1);
+            
+            // Color Logic for RSI
+            if (rsiVal < 30) { rsiBar.className = "meter-fill bg-green-500"; rsiText.className = "font-bold text-green-400"; }
+            else if (rsiVal > 70) { rsiBar.className = "meter-fill bg-red-500"; rsiText.className = "font-bold text-red-400"; }
+            else { rsiBar.className = "meter-fill bg-blue-500"; rsiText.className = "font-bold text-gray-400"; }
+
+            // Update Sentiment
+            const sentVal = data.sentiment;
+            const sentBar = document.getElementById('sent-bar');
+            const sentText = document.getElementById('sent-display');
+
+            sentBar.style.width = `${sentVal * 100}%`;
+            sentText.innerText = sentVal.toFixed(2);
+
+            // Color Logic for Sentiment
+            if (sentVal > 0.5) { sentBar.className = "meter-fill bg-green-500"; sentText.className = "font-bold text-green-400"; }
+            else if (sentVal < 0.4) { sentBar.className = "meter-fill bg-red-500"; sentText.className = "font-bold text-red-400"; }
+            else { sentBar.className = "meter-fill bg-blue-500"; sentText.className = "font-bold text-gray-400"; }
+        }
+
+        function updateAccountStats(account) {
+            const equity = parseFloat(account.equity);
+            const pl = parseFloat(account.pl);
+            const startBalance = equity - pl; 
+            
+            let percent = 0;
+            if (startBalance !== 0) {
+                percent = (pl / startBalance) * 100;
+            }
+
+            document.getElementById('equity-val').innerText = '$' + equity.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            
+            const plEl = document.getElementById('pl-val');
+            const roiEl = document.getElementById('roi-val');
+            
+            const sign = pl >= 0 ? '+' : '';
+            const colorClass = pl >= 0 ? 'text-green-500' : 'text-red-500';
+
+            plEl.innerText = sign + '$' + pl.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            plEl.className = colorClass;
+
+            roiEl.innerText = sign + percent.toFixed(6) + '%';
+            roiEl.className = colorClass;
+        }
+
+        function createLogItem(item) {
+            const side = (item.Side || 'INFO').toLowerCase();
+            let actionColor = 'text-blue-400'; 
+            let priceText = `$${parseFloat(item.Price || 0).toFixed(2)}`;
+
+            if (side === 'buy') actionColor = 'text-green-400';
+            else if (side === 'sell') actionColor = 'text-red-500';
+            else if (side === 'wait' || side === 'skip') {
+                actionColor = 'text-gray-500';
+                priceText = '---'; 
+            }
+            
+            return `
+            <div class="log-entry p-3 font-mono text-xs">
+                <div class="flex gap-3 text-gray-500 mb-1">
+                    <span>[${item.Time}]</span>
+                    <span class="text-gray-300 font-bold">${item.Symbol}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="${actionColor} font-bold uppercase">> ${item.Side || 'LOG'}</span>
+                    <span class="text-white">${priceText}</span>
+                </div>
+                <div class="mt-1 flex gap-4 text-[10px] text-gray-600">
+                    <span>RSI: <span class="text-gray-400">${parseFloat(item.RSI||0).toFixed(1)}</span></span>
+                    <span>SENT: <span class="text-gray-400">${parseFloat(item.Sentiment||0).toFixed(2)}</span></span>
+                </div>
+            </div>`;
+        }
+
+        function renderLogs(data, append = false) {
+            const container = document.getElementById('console-logs');
+            if (!data || data.length === 0) return;
+            const html = data.map(item => createLogItem(item)).join('');
+            if (append) container.innerHTML += html;
+            else container.innerHTML = html;
+        }
+
+        function renderSidebar() {
+            const list = document.getElementById('stock-list');
+            list.innerHTML = assets.map(a => `
+                <div onclick="setSymbol('${a.s}', '${a.d}')" 
+                     class="cursor-pointer p-3 border-l-2 border-transparent hover:bg-[#111] ${a.s === activeSymbol ? 'active-stock' : 'text-gray-500'}">
+                    <div class="flex justify-between items-center">
+                        <span class="font-bold text-sm tracking-wider">${a.d}</span>
+                    </div>
+                </div>
+            `).join('');
+            document.getElementById('overlay-symbol').innerText = activeSymbol.split(':')[1];
+        }
+
+        window.setSymbol = (sym, display) => {
+            activeSymbol = sym;
+            renderSidebar();
+            initChart(sym);
+            updateMeters(sym); // Updates the bottom panel for the clicked stock
+            document.getElementById('overlay-symbol').innerText = display;
+        }
+
+        function initChart(sym) {
+            if (typeof TradingView === 'undefined') return;
+            document.getElementById('tv_chart_container').innerHTML = "";
+            new TradingView.widget({
+                "autosize": true,
+                "symbol": sym,
+                "interval": "D",
+                "timezone": "Etc/UTC",
+                "theme": "dark",
+                "style": "1",
+                "locale": "en",
+                "enable_publishing": false,
+                "hide_top_toolbar": false,
+                "hide_legend": true,
+                "save_image": false,
+                "container_id": "tv_chart_container",
+                "toolbar_bg": "#000000",
+                "overrides": {
+                    "paneProperties.background": "#000000",
+                    "paneProperties.vertGridProperties.color": "#111111",
+                    "paneProperties.horzGridProperties.color": "#111111",
+                    "scalesProperties.textColor": "#333333"
+                }
+            });
+        }
+    </script>
+</body>
+</html>
