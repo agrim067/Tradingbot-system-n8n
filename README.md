@@ -5,7 +5,6 @@ Automated algorithmic trading system monitoring the Magnificent 7 stocks + AMD ,
 
 An automated algorithmic trading protocol designed to monitor the "Magnificent 7" stocks (plus AMD). This system integrates technical indicators (RSI) with AI-driven news sentiment analysis to execute paper trades, served to a custom frontend dashboard via a custom API.
 
-![Dashboard Preview](Screenshot 2026-04-05 133008.png)
 
 ## 🏗️ System Architecture
 This project is built using a microservice architecture, broken down into three core backend workflows (built on n8n) and a frontend dashboard.
